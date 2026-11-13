@@ -1,0 +1,14 @@
+# Secretos
+.env
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Datos locales (base de datos y fotos de ciudadanos: datos personales sensibles)
+*.db
+*.db-journal
+backend/data/
+backend/logs/
