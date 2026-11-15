@@ -27,6 +27,8 @@ TERMS = (
     "*Autorización de tratamiento de datos (Ley 1581 de 2012)*\n\n"
     "Para registrar tu reporte necesitamos tu nombre, número de cédula, ubicación, fotos del inmueble "
     "y datos de tu hogar o de tu negocio. Los usaremos únicamente para evaluar los daños y priorizar ayudas. "
+    "Las fotos de los daños las revisa un servicio de inteligencia artificial (Claude, de Anthropic) "
+    "solo para clasificar el daño de forma preliminar. "
     "Las preguntas sobre pertenencia étnica y la foto de tu rostro son *opcionales*. "
     "Puedes consultar, corregir o pedir que se eliminen tus datos en cualquier momento.\n\n"
     "_GeoAid es un prototipo universitario presentado en Expoandes: los datos se usan solo para esta "

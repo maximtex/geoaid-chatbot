@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     MEDIA_DIR: Path = Path("./data/media")
     MAX_MEDIA_BYTES: int = 10 * 1024 * 1024
 
+    # Semáforo de daño con visión (app/services/vision_service.py). Sin clave, las fotos quedan sin clasificar.
+    ANTHROPIC_API_KEY: str = ""
+    VISION_MODEL: str = "claude-sonnet-5-5"
+
     # Demo / integración con la web
     DEMO_PHONES: str = ""  # "573001234567,573109876543": pueden usar "reiniciar demo"
     CORS_ORIGINS: str = "https://geo-aid-coral.vercel.app,http://localhost:3000"
