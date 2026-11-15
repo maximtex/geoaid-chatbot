@@ -173,7 +173,7 @@ Las cifras de hogares (`people_affected`, `vulnerable_households`, `displaced_ho
 
 ## Dónde se guardan los datos
 
-Todo queda **solo en el computador donde corre el bot**. Nada se sube a la nube ni a git.
+Todo queda **solo en el computador donde corre el bot**. Nada se sube a git. La única excepción son las **fotos del daño**: se envían a la API de Claude (Anthropic) para el semáforo y no se guardan en otro lado. La cédula y la selfie nunca salen del computador.
 
 | Qué | Dónde |
 |---|---|
@@ -215,11 +215,30 @@ const res = await fetch(`${BOT_URL}/api/v1/reports/public`, {
 | `app/bot/meta_client.py` | Envío de mensajes y descarga de fotos (Graph API) |
 | `app/api/public.py` | Endpoints anonimizados para la web |
 | `app/services/ocr_service.py` | OCR de cédula. **Simulado**: lo reemplaza el equipo de OCR |
-| `app/services/vision_service.py` | Semáforo de daño. **Simulado**: lo reemplaza el equipo de visión |
+| `app/services/vision_service.py` | Semáforo de daño con Claude (ver "Semáforo de daño") |
 | `app/services/alerts.py` | Reglas de alertas para el revisor |
 | `data/media/` | Fotos guardadas. **Privada**: no se publica y no se sube a git |
 
-**Integrar el OCR y la visión reales:** reemplaza el cuerpo de `extract_id_data` y `analyze_building_damage` manteniendo su firma; el contrato está documentado en cada archivo. El bot ejecuta como máximo 2 análisis a la vez y le avisa al ciudadano mientras espera.
+**Integrar el OCR real:** reemplaza el cuerpo de `extract_id_data` manteniendo su firma; el contrato está documentado en el archivo. El bot ejecuta como máximo 2 análisis a la vez y le avisa al ciudadano mientras espera.
+
+## Semáforo de daño
+
+Al recibir las fotos del daño, `analyze_building_damage` se las envía a Claude junto con los criterios del semáforo y guarda en el reporte:
+
+- `damage_level`: `VERDE`, `AMARILLO`, `ROJO` o `null` (sin clasificar).
+- `damage_confidence`: de 0 a 1.
+
+Lo que vio el modelo ("grieta diagonal en muro de carga", etc.) queda en los logs del bot.
+
+Es una clasificación **preliminar para priorizar visitas**: el reporte sigue pendiente de revisión humana y el bot **no** le dice el color al ciudadano. Queda sin clasificar si las fotos no muestran la edificación, si la confianza es menor que 0,4, si la API falla o si no hay `ANTHROPIC_API_KEY` en el `.env`.
+
+Para configurarlo, crea una clave en [platform.claude.com](https://platform.claude.com), cárgale créditos y ponla en `ANTHROPIC_API_KEY`. El modelo se cambia con `VISION_MODEL`.
+
+Para probar con fotos sueltas, sin WhatsApp:
+
+```powershell
+.\.venv\Scripts\python -m app.services.vision_service foto1.jpg foto2.jpg
+```
 
 ## Pruebas y migraciones
 

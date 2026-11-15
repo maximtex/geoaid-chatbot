@@ -5,3 +5,5 @@ pydantic>=2.10,<3
 pydantic-settings>=2.7,<3
 sqlalchemy>=2.0.36,<2.1
 alembic>=1.14,<2
+anthropic>=2.8,<3
+pillow>=11,<14
