@@ -2,7 +2,8 @@
 
 Usa un modelo de visión (Claude, de Anthropic) para dar una clasificación PRELIMINAR que ayuda a
 priorizar las visitas técnicas. No reemplaza la inspección de un ingeniero: cada reporte sigue
-pendiente de revisión humana y el bot no le muestra el color al ciudadano.
+pendiente de revisión humana. El ciudadano ve el nivel estimado con advertencias de
+seguridad (content.damage_result), siempre presentado como una estimación preliminar.
 
 Contrato (el mismo de la versión simulada):
 - Recibe de 1 a 3 rutas absolutas de imágenes del mismo inmueble.

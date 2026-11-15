@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import content
-from app.db.models import AlertCode, Business, MediaFile, Report, ReportAlert, ReportStatus
+from app.db.models import AlertCode, Business, DamageLevel, MediaFile, Report, ReportAlert, ReportStatus
 
 
 def add_alert(report: Report, code: AlertCode, detail: str | None = None) -> None:
@@ -77,6 +77,13 @@ def evaluate_on_submit(db: Session, report: Report) -> None:
         repeated.update(str(report_id) for report_id in matches if report_id is not None)
     if repeated:
         add_alert(report, AlertCode.FOTO_REPETIDA, "Foto idéntica en reporte(s) id: " + ", ".join(sorted(repeated)))
+
+    if report.damage_level == DamageLevel.ROJO and report.habitability in content.STILL_LIVING_THERE:
+        add_alert(
+            report,
+            AlertCode.RIESGO_NO_REPORTADO,
+            "Las fotos se estimaron en ROJO, pero el hogar dice que sigue viviendo allí: contactar primero.",
+        )
 
     if report.at_property is False and report.latitude is not None:
         add_alert(

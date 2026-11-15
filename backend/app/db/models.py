@@ -78,6 +78,7 @@ class AlertCode(StrEnum):
     PERDIDA_ALTA = "PERDIDA_ALTA"  # pérdidas estimadas de 50 millones o más
     NIT_DUPLICADO = "NIT_DUPLICADO"  # el mismo NIT reportado desde otro teléfono
     RIESGO_ESTRUCTURAL = "RIESGO_ESTRUCTURAL"  # daño grave o colapso, pero el negocio sigue funcionando
+    RIESGO_NO_REPORTADO = "RIESGO_NO_REPORTADO"  # la foto sale ROJO, pero el hogar dice que sigue viviendo allí
     PRESTAMO_INFORMAL = "PRESTAMO_INFORMAL"  # deudas con prestamistas informales ("gota a gota")
     OBLIGACIONES_PENDIENTES = "OBLIGACIONES_PENDIENTES"  # registro, RUT, ICA, etc. sin estar al día
 
