@@ -2,6 +2,7 @@
 
 import base64
 import io
+import json
 from types import SimpleNamespace
 
 import anthropic
@@ -26,14 +27,17 @@ class FakeMessages:
         return self.result
 
 
-def tool_response(**data):
-    return SimpleNamespace(content=[SimpleNamespace(type="tool_use", name="registrar_evaluacion", input=data)])
+def text_response(text, stop_reason="end_turn"):
+    # Con el razonamiento activo, la API devuelve un bloque "thinking" antes del texto con el JSON.
+    return SimpleNamespace(
+        content=[SimpleNamespace(type="thinking", thinking=""), SimpleNamespace(type="text", text=text)],
+        stop_reason=stop_reason,
+    )
 
 
 def evaluation(nivel="ROJO", confianza=0.85, muestra_edificacion=True, hallazgos=("columna fracturada",)):
-    return tool_response(
-        muestra_edificacion=muestra_edificacion, nivel=nivel, confianza=confianza, hallazgos=list(hallazgos)
-    )
+    data = {"muestra_edificacion": muestra_edificacion, "nivel": nivel, "confianza": confianza, "hallazgos": list(hallazgos)}
+    return text_response(json.dumps(data))
 
 
 @pytest.fixture
@@ -68,7 +72,10 @@ def test_clasifica_con_el_nivel_del_modelo(api, photo):
     assert result.notes == ("columna fracturada",)
     call = api.calls[0]
     assert call["model"] == "modelo"
-    assert call["tool_choice"] == {"type": "tool", "name": "registrar_evaluacion"}
+    # Sonnet 5.5 rechaza tool_choice forzado: la forma de la respuesta se pide con salida estructurada.
+    assert "tool_choice" not in call and "tools" not in call
+    assert call["output_config"]["format"]["type"] == "json_schema"
+    assert call["output_config"]["format"]["schema"]["additionalProperties"] is False
 
 
 @pytest.mark.parametrize("nivel", ["VERDE", "AMARILLO", "ROJO"])
@@ -100,8 +107,22 @@ def test_confianza_invalida_queda_sin_clasificar(api, photo, confianza):
     assert vs.analyze_building_damage([photo()]).level is None
 
 
-def test_respuesta_sin_la_herramienta_queda_sin_clasificar(api, photo):
-    api.result = SimpleNamespace(content=[SimpleNamespace(type="text", text="ROJO")])
+def test_la_api_puede_cambiar_las_mayusculas_del_nivel(api, photo):
+    api.result = evaluation(nivel="rojo")
+    assert vs.analyze_building_damage([photo()]).level == DamageLevel.ROJO
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        text_response("ROJO"),  # no es JSON
+        text_response('{"muestra_edificacion": true, "nivel": "RO', stop_reason="max_tokens"),  # cortada
+        text_response("[1, 2]"),  # JSON que no es un objeto
+        SimpleNamespace(content=[SimpleNamespace(type="thinking", thinking="")], stop_reason="refusal"),  # sin texto
+    ],
+)
+def test_respuesta_inesperada_queda_sin_clasificar(api, photo, response):
+    api.result = response
     assert vs.analyze_building_damage([photo()]) == vs.DamageAssessment(level=None)
 
 
