@@ -175,6 +175,7 @@ HABITABILITY_OPTIONS = (
     ("OTRO", "Otra situación", ""),
 )
 DISPLACED_PREFIX = "NO_"  # ids que significan que el hogar no puede habitar la vivienda
+STILL_LIVING_THERE = ("HABITABLE", "HABITABLE_RIESGO")  # el hogar sigue viviendo en la vivienda
 
 ASK_INJURED = "¿Hay personas *heridas* o que necesiten atención médica?"
 INJURED_WARNING = (
@@ -678,6 +679,54 @@ def photo_received(count: int, maximum: int) -> str:
 
 
 ASK_PHOTO_FIRST = "Aún no hemos recibido fotos. Envía al menos una foto del daño."
+
+
+# --- Resultado del semáforo de daño (estimación automática, no reemplaza al ingeniero) ------
+DAMAGE_DISCLAIMER = (
+    "Esta es una estimación preliminar hecha automáticamente a partir de tus fotos. "
+    "No reemplaza la evaluación de un ingeniero."
+)
+DAMAGE_RESULT = {
+    "ROJO": (
+        "🔴 *Nivel de daño estimado: ALTO*\n\n"
+        f"{DAMAGE_DISCLAIMER}\n\n"
+        "⚠️ *Por tu seguridad:*\n"
+        "• No ingreses a la edificación y mantente a más de 10 metros. Si es de varios pisos, aléjate aún más.\n"
+        "• Las réplicas pueden causar nuevos derrumbes.\n"
+        f"• Si hay personas heridas o atrapadas, llama de inmediato al *{EMERGENCY_LINE}*.\n\n"
+        "Si decides acercarte o ingresar, lo haces bajo tu propia responsabilidad. "
+        "Un revisor analizará tu reporte."
+    ),
+    "AMARILLO": (
+        "🟡 *Nivel de daño estimado: MEDIO*\n\n"
+        f"{DAMAGE_DISCLAIMER}\n\n"
+        "⚠️ *Por precaución:*\n"
+        "• Evita ingresar y mantente a más de 10 metros hasta que un profesional revise la estructura.\n"
+        "• Si notas grietas que crecen, inclinación, crujidos o caída de materiales, aléjate de inmediato.\n\n"
+        "Si decides acercarte o ingresar, lo haces bajo tu propia responsabilidad. "
+        "Un revisor analizará tu reporte."
+    ),
+    "VERDE": (
+        "🟢 *Nivel de daño estimado: BAJO*\n\n"
+        "En las fotos que enviaste no se detectaron daños graves visibles. Esto *no confirma* que la "
+        "edificación sea segura: puede haber daños que no se ven en una foto.\n\n"
+        "• Antes de ingresar, revisa si hay grietas nuevas, puertas o ventanas que ya no cierran, "
+        "olor a gas o cables expuestos.\n"
+        "• Ante cualquier duda, no ingreses y espera la evaluación de un profesional.\n\n"
+        "Esta estimación es solo orientativa. GeoAid no se hace responsable por las decisiones que se "
+        "tomen con base en ella."
+    ),
+}
+DAMAGE_UNCLASSIFIED = (
+    "No pudimos estimar el nivel de daño con tus fotos. Un revisor las analizará.\n\n"
+    "Mientras tanto, si ves daños en la edificación, no ingreses y mantente a una distancia segura. "
+    f"Si hay heridos, llama al *{EMERGENCY_LINE}*."
+)
+
+
+def damage_result(level: str | None) -> str:
+    """Mensaje para el ciudadano según el nivel estimado. `None` o desconocido = sin clasificar."""
+    return DAMAGE_RESULT.get(level or "", DAMAGE_UNCLASSIFIED)
 
 
 def submitted(code: str, business: bool = False, home_pending: bool = False) -> str:
