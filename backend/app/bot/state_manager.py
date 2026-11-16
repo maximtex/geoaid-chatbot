@@ -1519,6 +1519,8 @@ class Bot:
         ctx.db.flush()
         alerts.evaluate_on_submit(ctx.db, report)
 
+        # El ciudadano ve el nivel estimado con sus advertencias de seguridad, antes del código.
+        ctx.out.append(Text(content.damage_result(report.damage_level)))
         home_pending = business is not None and bool(business.in_home)
         ctx.out.append(Text(content.submitted(report.confirmation_code, business is not None, home_pending)))
         self._goto(ctx, State.COMPLETED)
