@@ -62,7 +62,7 @@ def test_pregunta_cuando_se_estabiliza_y_mueve_la_respuesta_hasta_el_cuadro_actu
         assert session.process(_frame(i)) == []
     assert session.queries == 0  # todavía no hay 3 cuadros seguidos con seguimiento
     session.process(_frame(3))
-    assert session.queries == 1 and session.status == "analizando…"
+    assert session.queries == 1 and session.status.startswith("analizando")
 
     for i in range(4, 10):  # Claude tarda: la cámara sigue moviéndose
         session.process(_frame(i))
@@ -97,7 +97,22 @@ def test_un_corte_descarta_la_respuesta_pendiente_y_pregunta_de_una(setup):
     executor.futures[0].set_result([BOX])
     session.process(_frame(5, OTHER))
     assert session.boxes == []  # era de la escena anterior
+    assert session.status.startswith("analizando")  # ya va la consulta de la escena nueva
     assert session.queries == 2  # en la escena nueva pregunta sin esperar los 4 s
+
+
+def test_avisa_cuando_la_respuesta_llega_tarde(tmp_path):
+    now = [0.0]
+    executor = ManualExecutor()
+    session = live.LiveSession(lambda path: None, tmp_path, max_queries=1, clock=lambda: now[0], executor=executor)
+    for i in range(4):
+        session.process(_frame(i))
+    session.process(_frame(0, OTHER))  # corte
+    executor.futures[0].set_result([BOX])
+    session.process(_frame(1, OTHER))
+    assert session.status == "la toma cambió antes de la respuesta"
+    now[0] = 10.0
+    assert session.status == "tope de 1 consultas"
 
 
 def test_respeta_el_tope_de_consultas(tmp_path):

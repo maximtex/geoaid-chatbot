@@ -17,6 +17,7 @@ Teclas: Q o Esc salir · Espacio pausa (solo video) · C preguntar ya · B borra
 """
 
 import argparse
+import logging
 import math
 import subprocess
 import sys
@@ -47,6 +48,9 @@ MAX_WIDTH = 1600  # se trabaja y se muestra a este ancho como máximo
 MIN_OVERLAP = 0.7  # si la vista actual comparte menos que esto con la última consultada, toca preguntar otra vez
 STABLE_FRAMES = 3  # cuadros seguidos con seguimiento antes de preguntar (evita mandar una transición)
 WINDOW = "GeoAid - dron en vivo"
+NOTE_S = 3.0  # cuánto se ve en pantalla un aviso como "la escena cambió"
+
+logger = logging.getLogger(__name__)
 
 Detector = Callable[[Path], list[Box] | None]
 
@@ -54,6 +58,8 @@ Detector = Callable[[Path], list[Box] | None]
 @dataclass
 class _Pending:
     future: Future
+    number: int
+    sent_at: float
     to_now: np.ndarray = field(default_factory=lambda: np.eye(3))  # del cuadro enviado al cuadro actual
     valid: bool = True  # deja de servir si la cámara corta o se pierde el seguimiento
 
@@ -82,17 +88,20 @@ class LiveSession:
         self._last_query = -math.inf
         self._stable = 0
         self._force = False
+        self._note: tuple[str, float] | None = None  # aviso temporal y hasta cuándo se muestra
 
     # --- cada cuadro ---
 
     def process(self, frame: np.ndarray) -> list:
         height, width = frame.shape[:2]
+        self._collect()  # lo que llegó hasta el cuadro anterior; abajo se mueve hasta este
         step = self.tracker.step(frame)
         if step is None:  # primer cuadro, corte o seguimiento perdido: lo anterior ya no corresponde
             self.boxes, self.view_to_now, self._stable = [], None, 0
             self._last_query = -math.inf  # vista nueva: se pregunta apenas se estabilice, sin esperar `every_s`
-            if self.pending:
+            if self.pending and self.pending.valid:
                 self.pending.valid = False
+                logger.info("La toma cambió mientras Claude respondía la consulta %d: esa respuesta se descarta", self.pending.number)
         else:
             self._stable += 1
             if self.view_to_now is not None:
@@ -100,7 +109,6 @@ class LiveSession:
             if self.pending and self.pending.valid:
                 self.pending.to_now = step @ self.pending.to_now
 
-        self._collect()
         if self._should_ask(width, height):
             self._ask(frame)
         if not self.boxes or self.view_to_now is None:
@@ -116,7 +124,9 @@ class LiveSession:
     @property
     def status(self) -> str | None:
         if self.pending and self.pending.valid:
-            return "analizando…"
+            return f"analizando… {self.clock() - self.pending.sent_at:.0f} s"
+        if self._note and self.clock() < self._note[1]:
+            return self._note[0]
         if self.queries >= self.max_queries:
             return f"tope de {self.max_queries} consultas"
         if self.failed:
@@ -139,7 +149,8 @@ class LiveSession:
         self._last_query, self._force = self.clock(), False
         path = self.work_dir / f"clave_{self.queries:03d}.jpg"
         cv2.imwrite(str(path), frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
-        self.pending = _Pending(self.executor.submit(self.detector, path))
+        self.pending = _Pending(self.executor.submit(self.detector, path), self.queries, self.clock())
+        logger.info("Consulta %d enviada a Claude", self.queries)
 
     def _collect(self) -> None:
         if not self.pending or not self.pending.future.done():
@@ -149,8 +160,15 @@ class LiveSession:
             result = pending.future.result()
         except Exception:  # noqa: BLE001 (una consulta fallida no debe tumbar la pantalla)
             result = None
+        elapsed = self.clock() - pending.sent_at
         self.failed = result is None
-        if pending.valid and result is not None:
+        if result is None:
+            logger.warning("Consulta %d: la IA no respondió (%.1f s)", pending.number, elapsed)
+        elif not pending.valid:
+            # Pasa con videos que cambian de toma más rápido de lo que responde Claude (≈ 6 s).
+            self._note = ("la toma cambió antes de la respuesta", self.clock() + NOTE_S)
+        else:
+            logger.info("Consulta %d: %d recuadros en %.1f s", pending.number, len(result), elapsed)
             self.boxes, self.view_to_now = result, pending.to_now
 
 
@@ -244,6 +262,9 @@ class _Recorder:
 
 
 def run_live(args, detector: Detector | None = None) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    for name in ("httpx", "anthropic", "app.drone.boxes"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     if detector is None:
         if not get_settings().ANTHROPIC_API_KEY:
             print("Falta ANTHROPIC_API_KEY en backend\\.env: se verá la imagen, pero sin recuadros.")
