@@ -176,7 +176,7 @@ def test_el_recuadro_se_mueve_con_la_imagen(paneo):
     motion = tracking.estimate_motion(paneo)
     box = Box(0.5, 0.5, 0.6, 0.6, "ROJO", 0.9, "x")
     plan = tracking._frame_plan(motion, {10: [box], 25: []})
-    [(corners, _)] = tracking._shapes_for(plan[0], motion.width, motion.height)
+    [(corners, _)] = tracking.shapes_for(plan[0], motion.width, motion.height)
     # En el cuadro 0 la cámara estaba 40 px más a la izquierda: la casa se veía 40 px más a la derecha.
     assert corners[0][0] == pytest.approx(0.5 * 640 + 40, abs=2)
     assert 25 not in plan  # la segunda escena no tiene edificaciones

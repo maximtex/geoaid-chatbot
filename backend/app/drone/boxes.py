@@ -123,7 +123,7 @@ class Box:
     label: str
 
 
-def detect_buildings(image_path: Path, effort: str = "low") -> list[Box] | None:
+def detect_buildings(image_path: Path, effort: str = "low", model: str | None = None) -> list[Box] | None:
     """Recuadros de las edificaciones del cuadro. None si no se pudo preguntar (sin clave, sin imagen o error)."""
     settings = get_settings()
     if not settings.ANTHROPIC_API_KEY:
@@ -134,7 +134,7 @@ def detect_buildings(image_path: Path, effort: str = "low") -> list[Box] | None:
         return None
     try:
         response = _client(settings.ANTHROPIC_API_KEY).messages.create(
-            model=settings.VISION_MODEL,
+            model=model or settings.VISION_MODEL,
             max_tokens=MAX_TOKENS,
             system=BOXES_PROMPT,
             output_config={"effort": effort, "format": {"type": "json_schema", "schema": _SCHEMA}},

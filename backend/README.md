@@ -290,6 +290,32 @@ Devuelve el mismo video del dron con un recuadro de color sobre cada edificació
 - **No es en vivo:** el video se procesa después del vuelo. En la expo se proyecta el resultado, que no depende del internet del lugar.
 - **Es aproximado:** los recuadros y los niveles son una estimación para priorizar, igual que el semáforo.
 
+### Dron en vivo
+
+El mismo análisis, pero sobre la imagen que llega en ese momento: los recuadros aparecen unos segundos después de que una casa entra en cuadro (lo que tarda Claude) y desde ahí la siguen mientras la cámara se mueve. Solo se le pregunta otra vez a Claude cuando la vista cambió bastante o hubo un corte, y nunca más de una vez cada `--cada` segundos.
+
+```powershell
+# Cámara del PC (1, 2… para una capturadora HDMI o el celular usado como cámara)
+.\.venv\Scripts\python -m app.drone.live --fuente 0 --pantalla-completa
+
+# Un video grabado, a velocidad real, como si fuera el vuelo (en pantalla dice "VIDEO GRABADO")
+.\.venv\Scripts\python -m app.drone.live --fuente data\video_turquia\turquia_dron.mp4
+
+# La transmisión del dron (ver abajo), guardando una copia de lo que se ve
+.\.venv\Scripts\python -m app.drone.live --fuente rtmp://127.0.0.1:1935/dron --grabar vuelo.mp4
+```
+
+Teclas: `Q` o `Esc` salir · `Espacio` pausa · `C` preguntar ya · `B` borrar recuadros. Por defecto hace como máximo 40 consultas por sesión (≈ USD 0,80, `--max-consultas`). Los cuadros que se le mandaron a Claude quedan en `data/vuelos/vivo_<fecha>/`.
+
+**Pasar la imagen del dron al PC (DJI Fly con control RC-N1/RC-N2 y celular):**
+
+1. Descargar [MediaMTX](https://github.com/bluenviron/mediamtx/releases) para Windows, descomprimirlo y abrir `mediamtx.exe` (es un servidor de video local; permitir el acceso en el firewall de Windows).
+2. Conectar el PC al punto de acceso del celular (así el PC también tiene internet para Claude) y ver la IP del PC con `ipconfig`.
+3. En DJI Fly: Transmisión en vivo → RTMP → `rtmp://<IP del PC>:1935/dron`.
+4. Correr `python -m app.drone.live --fuente rtmp://127.0.0.1:1935/dron`.
+
+La transmisión llega con 2 a 4 segundos de retraso. Con los controles que traen pantalla (DJI RC, RC 2) puede que no aparezca la opción RTMP; en ese caso hay que usar un control con celular.
+
 ## Pruebas y migraciones
 
 ```bash

@@ -66,31 +66,48 @@ class Motion:
 # ---------- Movimiento de la cámara ----------
 
 
+class MotionTracker:
+    """Estima, cuadro a cuadro, cómo se movió la imagen respecto al cuadro anterior.
+
+    `step(frame)` devuelve la homografía del cuadro anterior a este (en píxeles del cuadro completo), o
+    None en el primer cuadro, en un corte de escena o cuando se pierde el seguimiento.
+    """
+
+    def __init__(self) -> None:
+        self._orb = cv2.ORB_create(nfeatures=2000, fastThreshold=12)
+        self._matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+        self._previous = self._previous_tiny = None
+        self._shape = None
+
+    def step(self, frame: np.ndarray) -> np.ndarray | None:
+        height, width = frame.shape[:2]
+        scale = WORK_WIDTH / width
+        small = cv2.cvtColor(cv2.resize(frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+        tiny_size = (160, max(1, round(160 * small.shape[0] / small.shape[1])))
+        tiny = cv2.resize(small, tiny_size, interpolation=cv2.INTER_AREA).astype(np.float32)
+        current = self._orb.detectAndCompute(small, None)
+        step = None
+        # Un corte se nota en que casi toda la imagen cambia de golpe; los logos y subtítulos fijos
+        # pueden engañar a la homografía, pero no a esta diferencia.
+        same_size = self._shape == (height, width)
+        if self._previous is not None and same_size and float(np.mean(np.abs(tiny - self._previous_tiny))) < CUT_DIFF:
+            step = _homography(self._previous, current, self._matcher)
+        self._previous, self._previous_tiny, self._shape = current, tiny, (height, width)
+        return _to_full_size(step, scale) if step is not None else None
+
+
 def estimate_motion(video: Path, on_progress: Callable[[int], None] | None = None) -> Motion:
     capture = _open_video(video)
     fps = capture.get(cv2.CAP_PROP_FPS) or 30.0
-    orb = cv2.ORB_create(nfeatures=2000, fastThreshold=12)
-    matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
+    tracker = MotionTracker()
     steps: list[np.ndarray | None] = []
-    previous = previous_tiny = None
     width = height = 0
     while True:
         ok, frame = capture.read()
         if not ok:
             break
         height, width = frame.shape[:2]
-        scale = WORK_WIDTH / width
-        small = cv2.cvtColor(cv2.resize(frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
-        tiny = cv2.resize(small, (160, max(1, round(160 * small.shape[0] / small.shape[1]))), interpolation=cv2.INTER_AREA)
-        tiny = tiny.astype(np.float32)
-        current = orb.detectAndCompute(small, None)
-        step = None
-        # Un corte se nota en que casi toda la imagen cambia de golpe; los logos y subtítulos fijos
-        # pueden engañar a la homografía, pero no a esta diferencia.
-        if previous is not None and float(np.mean(np.abs(tiny - previous_tiny))) < CUT_DIFF:
-            step = _homography(previous, current, matcher)
-        steps.append(_to_full_size(step, scale) if step is not None else None)
-        previous, previous_tiny = current, tiny
+        steps.append(tracker.step(frame))
         if on_progress and len(steps) % 100 == 0:
             on_progress(len(steps))
     capture.release()
@@ -203,7 +220,7 @@ def render(video: Path, motion: Motion, results: dict[int, list[Box]], out_path:
             if not ok:
                 break
             rgb = Image.fromarray(cv2.cvtColor(frame[:height, :width], cv2.COLOR_BGR2RGB))
-            shapes = _shapes_for(plan.get(index), width, height)
+            shapes = shapes_for(plan.get(index), width, height)
             encoder.stdin.write(draw_overlay(rgb, shapes).tobytes())
             index += 1
     finally:
@@ -232,7 +249,7 @@ def _frame_plan(motion: Motion, results: dict[int, list[Box]]) -> dict[int, tupl
     return plan
 
 
-def _shapes_for(entry, width: int, height: int):
+def shapes_for(entry, width: int, height: int):
     if entry is None:
         return []
     boxes, homography = entry
